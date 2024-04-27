@@ -231,7 +231,6 @@ def remove_piece(board, pos):
     result = copy.deepcopy(board)
 
     result[pos[0]][pos[1]] = EMPTY
-    print(result)
     return result
 
 
