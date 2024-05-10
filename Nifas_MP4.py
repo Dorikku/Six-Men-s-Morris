@@ -2,6 +2,8 @@ import numpy as np
 import pygame
 import sys
 import time
+import copy
+import random
 
 import six_men_morris as smm
 
@@ -21,6 +23,21 @@ BLUE = "#3E5AAA"
 board = smm.create_board()
 
 
+#Player Initialization
+user = None
+ai_turn = False
+player = smm.p1
+all_pieces_placed = False
+clicked_piece = (None, None)
+free_slots = set()
+line_forms = set()
+pieces_can_remove = set()
+line_moved = False
+temp_line_forms = set()
+
+ai_mills = set()
+player_mills = set()
+
 # Function to draw text on the screen
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
@@ -39,6 +56,75 @@ def draw_board():
     pygame.draw.line(screen, BG, (board_width/2-47, 85), (board_width/2-47, 220), 5)
     pygame.draw.line(screen, BG, (board_width/2-47, 500), (board_width/2-47, 635), 5)
 
+    for i in range(HEIGHT):
+        row = []
+        for j in range(WIDTH):
+
+            # Draw rectangle for cell
+            rect = pygame.Rect(
+                board_origin[0] + j * cell_size,
+                board_origin[1] + i * cell_size,
+                cell_size, cell_size
+            )
+            circle = (
+                board_origin[0] + j * cell_size + 68,
+                board_origin[1] + i * cell_size + 68,
+            )
+
+            if board[i][j] != smm.X:
+                pygame.draw.circle(screen, BG, circle, 15)
+
+                if board[i][j] == smm.EMPTY and not all_pieces_placed:
+                    pygame.draw.circle(screen, WHITE, circle, 40, 3)
+            
+            # Draw red pieces
+            if board[i][j] == smm.p1:
+                pygame.draw.circle(screen, RED, circle, 40)
+
+            # Draw yellow pieces
+            if board[i][j] == smm.p2:
+                pygame.draw.circle(screen, YELLOW, circle, 40)
+            
+            # Highlight clicked piece
+            if (i,j) == clicked_piece:
+                pygame.draw.circle(screen, BLACK, circle, 40, 3)
+
+            # Highlight possible moves
+            if (i,j) in free_slots:
+                pygame.draw.circle(screen, WHITE, circle, 40, 3)
+
+            # Highlight enemy pieces that can be removed
+            if (i,j) in pieces_can_remove:
+                pygame.draw.circle(screen, BLACK, circle, 40, 3)
+                
+
+            row.append(rect)
+        cells.append(row)
+
+        # pygame.display.flip()
+
+
+# Remove piece
+def remove_piece(board, pos):
+    """
+    Removes piece from the board
+    """
+    result = copy.deepcopy(board)
+    removed = False
+
+    while(not removed):
+        click, _, _ = pygame.mouse.get_pressed()
+        if click == 1 and user == player and not game_over:
+            mouse = pygame.mouse.get_pos()
+            for i in range(HEIGHT):
+                for j in range(WIDTH):
+                    if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+                            result[pos[0]][pos[1]] = smm.EMPTY
+                            time.sleep(0.3)
+                            pieces_can_remove.clear()
+                            removed = True 
+    
+    return result
 
 
 
@@ -64,16 +150,7 @@ board_origin = (BOARD_PADDING, BOARD_PADDING)
 # # Show instructions initially
 # instructions = True
 
-#Player Initialization
-user = None
-ai_turn = False
-player = smm.p1
-all_pieces_placed = False
-clicked_piece = (None, None)
-free_slots = set()
-line_forms = set()
-pieces_can_remove = set()
-line_moved = False
+
 
 
 
@@ -145,57 +222,7 @@ while True:
     # Draw board
     cells = []
     draw_board()
-    for i in range(HEIGHT):
-        row = []
-        for j in range(WIDTH):
-
-            # Draw rectangle for cell
-            rect = pygame.Rect(
-                board_origin[0] + j * cell_size,
-                board_origin[1] + i * cell_size,
-                cell_size, cell_size
-            )
-            circle = (
-                board_origin[0] + j * cell_size + 68,
-                board_origin[1] + i * cell_size + 68,
-            )
-
-            if board[i][j] != smm.X:
-                pygame.draw.circle(screen, BG, circle, 15)
-
-                if board[i][j] == smm.EMPTY and not all_pieces_placed:
-                    pygame.draw.circle(screen, WHITE, circle, 40, 3)
-            
-            # Draw red pieces
-            if board[i][j] == smm.p1:
-                pygame.draw.circle(screen, RED, circle, 40)
-
-            # Draw yellow pieces
-            if board[i][j] == smm.p2:
-                pygame.draw.circle(screen, YELLOW, circle, 40)
-            
-            # Highlight clicked piece
-            if (i,j) == clicked_piece:
-                pygame.draw.circle(screen, BLACK, circle, 40, 3)
-
-            # Highlight possible moves
-            if (i,j) in free_slots:
-                pygame.draw.circle(screen, WHITE, circle, 40, 3)
-
-
-            # Highlight enemy pieces that can be removed
-            if (i,j) in pieces_can_remove:
-                pygame.draw.circle(screen, BLACK, circle, 40, 3)
-                
-
-            
-            # if board[i][j] == 0:
-
-            # if (i,j) == (0,0):
-            #     pygame.draw.circle(screen, RED, circle, 40)
-                # pygame.draw.circle(screen, WHITE, circle, 40, 3)
-            row.append(rect)
-        cells.append(row)
+    
 
     # Checks if game over   
     game_over = smm.terminal(board)
@@ -203,6 +230,9 @@ while True:
     # Checks if all pieces are placed to the board
     if smm.p1_piece_count == 0 and smm.p2_piece_count == 0:
         all_pieces_placed = True
+
+    # line = smm.line_forms(board, player)
+
 
 
     # Show title    
@@ -239,19 +269,223 @@ while True:
         pygame.draw.circle(screen, YELLOW, pos, 40)
 
 
-    # -------------------- Check for AI move ---------------------------
-    if user != player and not game_over:
-        if ai_turn and not all_pieces_placed:
+    
+    if not all_pieces_placed:
+        # -------------------- Check for AI move ---------------------------
+        if user != player:
             time.sleep(0.5)
-            # smm.subtract_piece(player)
-            move = smm.minimax(board, player)
-            board = smm.result(board, move, player)
+
+            move = smm.pick_best_move(board, player)
+            smm.put_piece(board, move, player)
+            smm.subtract_piece(player)
+
+            mill = smm.line_forms(board, player)
+            
+            if not mill.issubset(ai_mills):
+                can_remove = smm.pieces_can_remove(board, player, ai_mills)
+                remove = random.choice(list(can_remove))
+                board = smm.remove_piece(board, remove)
+                for pos in mill:
+                    ai_mills.add(pos) 
+            
             player = smm.change_player(player)
-            ai_turn = False
-        elif ai_turn and all_pieces_placed:
-            player = smm.change_player(player)              #TEMPORARY
-        else:
-            ai_turn = True
+
+
+        # -------------------- Check for a user move -------------------------
+        click, _, _ = pygame.mouse.get_pressed()
+        if click == 1 and user == player and not game_over:
+            mouse = pygame.mouse.get_pos()
+            for i in range(HEIGHT):
+                for j in range(WIDTH):
+
+                    if (board[i][j] == smm.EMPTY and cells[i][j].collidepoint(mouse)):
+                        smm.subtract_piece(player)
+                        
+                        smm.put_piece(board, (i,j), player)
+
+                        line = smm.line_forms(board, player)
+
+                        if not line.issubset(player_mills):
+                            pieces_can_remove = smm.pieces_can_remove(board, player, line)
+                            for pos in line:
+                                player_mills.add(pos)
+                        else:
+                            player = smm.change_player(player)
+                        
+
+                    if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+                        board = smm.remove_piece(board, (i,j))
+                        pieces_can_remove.clear()
+                        player = smm.change_player(player)
+
+
+
+        """
+        # -------------------- Check for AI move ---------------------------
+        if user != player and not game_over:
+            if ai_turn:
+                
+
+                
+                time.sleep(0.5)
+                
+                line = smm.line_forms(board, player)
+                # print(line)
+
+                if not line.issubset(line_forms):
+                    move = smm.minimax(board, player)
+                    board = smm.result(board, move, player)
+
+
+                    player = smm.change_player(player)
+
+                    for pos in line:
+                        line_forms.add(pos)
+                else:
+                    move = smm.minimax(board, player)
+                    board = smm.result(board, move, player)
+
+                    smm.subtract_piece(player)
+                    line = smm.line_forms(board, player)
+
+
+                    if not line.issubset(line_forms):
+                        move = smm.minimax(board, player)
+                        board = smm.result(board, move, player)
+                        for pos in line:
+                            line_forms.add(pos)
+
+
+
+                # if not line.issubset(line_forms):
+                #     ai_turn = True
+                #     for pos in line:
+                #         line.add(pos)
+                # else:
+                player = smm.change_player(player)
+
+                ai_turn = False
+            else:
+                ai_turn = True
+
+        # -------------------- Check for a user move -------------------------
+        click, _, _ = pygame.mouse.get_pressed()
+        if click == 1 and user == player and not game_over:
+            mouse = pygame.mouse.get_pos()
+            for i in range(HEIGHT):
+                for j in range(WIDTH):
+                    # line = smm.line_forms(board, user)
+
+                    # if not line.issubset(smm.mills):
+                        
+                    if (board[i][j] == smm.EMPTY and cells[i][j].collidepoint(mouse)):
+                        smm.subtract_piece(player)
+                        move = [(i, j), None, None]
+                        board = smm.result(board, move, player)
+
+                        line = smm.line_forms(board, player)
+                        if not line.issubset(smm.user_mills):
+                            pieces_can_remove = smm.pieces_can_remove(board, player, line)
+                            for pos in line:
+                                smm.user_mills.add(pos) 
+                        else:
+                            player = smm.change_player(player)
+                        
+
+                    if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+                        board = smm.remove_piece(board, (i,j))
+                        pieces_can_remove.clear()
+
+
+                        player = smm.change_player(player)
+    """
+
+    """
+    # ------- instructions if all pieces are not yet placed ----------
+    if not all_pieces_placed:
+        # -------------------- Check for AI move ---------------------------
+        if user != player and not game_over:
+            if ai_turn:
+                line = smm.line_forms(board, user)
+
+                print(line)
+
+                if not line.issubset(line_forms):
+                    print("line forms")
+                    ai_turn = False
+                    player = smm.change_player(player)
+                # elif smm.line_forms(board, player):  
+                #     time.sleep(0.5)
+                #     move = smm.minimax(board, player)
+                #     board = smm.result(board, move, player)
+                #     player = smm.change_player(player)
+                #     ai_turn = False
+                else:
+                    print("gumawa ng move Ai")
+                    time.sleep(0.5)
+                    smm.subtract_piece(player)
+                    move = smm.minimax(board, player)
+                    board = smm.result(board, move, player)
+                    player = smm.change_player(player)
+                    ai_turn = False
+            else:
+                ai_turn = True
+                        
+
+
+        # -------------------- Check for a user move -------------------------
+        click, _, _ = pygame.mouse.get_pressed()
+        if click == 1 and user == player and not game_over:
+            mouse = pygame.mouse.get_pos()
+            for i in range(HEIGHT):
+                for j in range(WIDTH):
+
+                    line = smm.line_forms(board, player)
+                    # print(line)
+                    if not line.issubset(line_forms):
+                    # if line:
+                        print("burat")
+                        pieces_can_remove = smm.pieces_can_remove(board, player, line)
+                        print(pieces_can_remove)
+
+                        if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+                            print("REMOVED")
+                            board = remove_piece(board, (i,j))
+                            player = smm.change_player(player)
+
+                            # line.clear()
+                            # pieces_can_remove.clear()
+
+                            for pos in line:
+                                line_forms.add(pos)                        
+                    elif (board[i][j] == smm.EMPTY and cells[i][j].collidepoint(mouse)):
+                        smm.subtract_piece(player)
+                        move = [(i, j), None, None]
+                        board = smm.result(board, move, player)
+                        player = smm.change_player(player)
+
+    """
+
+
+
+
+
+
+
+
+    # # -------------------- Check for AI move ---------------------------
+    # if user != player and not game_over:
+    #     if ai_turn and not all_pieces_placed:
+    #         time.sleep(0.5)
+    #         # smm.subtract_piece(player)
+    #         move = smm.minimax(board, player)
+    #         board = smm.result(board, move, player)
+    #         player = smm.change_player(player)
+    #         ai_turn = False
+    #     elif ai_turn and all_pieces_placed:
+    #         player = smm.change_player(player)              #TEMPORARY
+    #     else:
+    #         ai_turn = True
 
 
 
@@ -271,42 +505,42 @@ while True:
 
 
     # -------------------- Check for a user move -------------------------
-    click, _, _ = pygame.mouse.get_pressed()
-    if click == 1 and user == player and not game_over:
-        mouse = pygame.mouse.get_pos()
-        for i in range(HEIGHT):
-            for j in range(WIDTH):
+    # click, _, _ = pygame.mouse.get_pressed()
+    # if click == 1 and user == player and not game_over:
+    #     mouse = pygame.mouse.get_pos()
+    #     for i in range(HEIGHT):
+    #         for j in range(WIDTH):
                 
 
-                if not all_pieces_placed:
-                    linline_moved = True
+    #             if not all_pieces_placed:
+    #                 line_moved = True
 
-                line_forms = smm.line_forms(board, player)
-                if line_forms and line_moved or len(line_forms) == 5:
-                    pieces_can_remove = smm.pieces_can_remove(board, player, line_forms)
-                    if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
-                        print("REMOVED")
-                        board = smm.remove_piece(board, (i,j))
-                        time.sleep(0.3)
-                        pieces_can_remove.clear()
+    #             line_forms = smm.line_forms(board, player)
+    #             if line_forms and line_moved or len(line_forms) == 5:
+    #                 pieces_can_remove = smm.pieces_can_remove(board, player, line_forms)
+    #                 if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+    #                     print("REMOVED")
+    #                     board = smm.remove_piece(board, (i,j))
+    #                     time.sleep(0.3)
+    #                     pieces_can_remove.clear()
 
-                        line_moved = False
+    #                     line_moved = False
 
 
-                elif (board[i][j] == smm.EMPTY and cells[i][j].collidepoint(mouse) and not all_pieces_placed):
-                    board = smm.result(board, (i, j), player)
-                    line_moved = True
+    #             elif (board[i][j] == smm.EMPTY and cells[i][j].collidepoint(mouse) and not all_pieces_placed):
+    #                 board = smm.result(board, (i, j), player)
+    #                 line_moved = True
 
-                    player = smm.change_player(player)
-                elif (board[i][j] == user and cells[i][j].collidepoint(mouse) and all_pieces_placed):
-                    clicked_piece = (i, j)
-                    free_slots = smm.moves(board, clicked_piece, player)
+    #                 player = smm.change_player(player)
+    #             elif (board[i][j] == user and cells[i][j].collidepoint(mouse) and all_pieces_placed):
+    #                 clicked_piece = (i, j)
+    #                 free_slots = smm.moves(board, clicked_piece, player)
                     
-                if (cells[i][j].collidepoint(mouse) and (i,j) in free_slots):
-                    print("clicked")
-                    board = smm.result(board, (i, j), player, clicked_piece)
-                    if clicked_piece in line_forms:
-                        line_moved = True
+    #             if (cells[i][j].collidepoint(mouse) and (i,j) in free_slots):
+    #                 print("clicked")
+    #                 board = smm.result(board, (i, j), player, clicked_piece)
+    #                 if clicked_piece in line_forms:
+    #                     line_moved = True
 
 
 

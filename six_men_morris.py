@@ -3,6 +3,7 @@ Six Men Morris Player
 """
 
 import copy
+import random
 import numpy as np
 
 
@@ -17,6 +18,9 @@ p2_piece_count = 6
 
 p1_piece_left = 6
 p2_piece_left = 6
+
+user_mills = set()
+ai_mills = set()
 
 
 def create_board():
@@ -234,43 +238,102 @@ def remove_piece(board, pos):
     return result
 
 
-# def result(board, action, p, init_pos):
-#     """
-#     Returns the board that results from making move (i, j) on the board.
-#     """
-#     # create a deep copy of the board 
-#     result = copy.deepcopy(board)
-#     all_pieces_placed = False
-#     # print(p1_piece_count, " - ", p2_piece_count)
-#     if all_pieces_placed:
-#         print("tite")
-#         result[action[0]][action[1]] = p
-#         result[init_pos[0]][init_pos[1]] = EMPTY
-#     else:
-#         result[action[0]][action[1]] = p
-#         subtract_piece(p)
-        
-#         print(p1_piece_count, " - ", p2_piece_count)
-
-#         if (p1_piece_count == 0 and p2_piece_count == 0):
-#             all_pieces_placed = True
-
-
-def result(*args):
+def result(board, action, p):
     """
     Returns the board that results from making move (i, j) on the board.
     """
     # create a deep copy of the board 
-    result = copy.deepcopy(args[0])
-
-    if len(args) == 3:
-        result[args[1][0]][args[1][1]] = args[2]
-        subtract_piece(args[2])
-    elif len(args) == 4:
-        result[args[1][0]][args[1][1]] = args[2]
-        result[args[3][0]][args[3][1]] = EMPTY
+    result = copy.deepcopy(board)
+    
+    if action[1] == None and action[2] == None:    
+        result[action[0][0]][action[0][1]] = p
+    elif action[1] != None:
+        print("tite")
+        result[action[1][0]][action[1][1]] = EMPTY
+    elif action[2] != None:
+        result[action[0]][action[0][1]] = p
+        result[action[2][0]][action[2][1]] = EMPTY
 
     return result
+        
+
+
+
+# def result(*args):
+#     """
+#     Returns the board that results from making move (i, j) on the board.
+#     """
+#     # create a deep copy of the board 
+#     result = copy.deepcopy(args[0])
+
+#     if len(args) == 3:
+#         result[args[1][0]][args[1][1]] = args[2]
+#         subtract_piece(args[2])
+#     elif len(args) == 4:
+#         result[args[1][0]][args[1][1]] = args[2]
+#         result[args[3][0]][args[3][1]] = EMPTY
+
+#     return result
+
+
+def score_position(board, player):
+    score = 0
+    opp_player = p1
+    if player == p1:
+        opp_player = p2
+
+    # for horizontal
+    for r in range(5):
+        window = [(i) for i in list(board[r,:])]
+        if r != 2:
+            if window.count(player) == 3:
+                score += 100
+            elif window.count(player) == 2 and window.count(EMPTY) == 1:
+                score += 10
+
+            if window.count(opp_player) == 2 and window.count(EMPTY) == 1:
+                score -= 50
+        
+    # for horizontal
+    for r in range(5):
+        window = [(i) for i in list(board[:,r])]
+        if r != 2:
+            if window.count(player) == 3:
+                score += 100
+            elif window.count(player) == 2 and window.count(EMPTY) == 1:
+                score += 10
+
+            if window.count(opp_player) == 2 and window.count(EMPTY) == 1:
+                score -= 50
+
+    return score
+
+    # For blocking 
+
+
+
+def pick_best_move(board, player):
+    valid_locations = actions(board)
+    best_score = -10000
+    best_pos = next(iter(valid_locations))
+    for pos in valid_locations:
+        temp_board = board.copy()
+        put_piece(temp_board, pos, player)
+        score = score_position(temp_board, player)
+        if score > best_score:
+            best_score = score
+            best_pos = pos
+
+    return best_pos
+
+
+def put_piece(board, pos, player):
+    """
+    puts piece on the board
+    """
+    board[pos[0]][pos[1]] = player
+    return board
+
 
 
 # Subtract player piece by 1
@@ -317,9 +380,74 @@ def minimax(board, p):
     """
     Returns the optimal action for the current player on the board.
     """
-    if p == p1:
-        move = next(iter(actions(board)))
-    elif p == p2:
-        move = next(iter(actions(board)))
+    # Initialize move. [0] - where to place the piece
+    # [1] - what piece to remove
+    # [2] - frome where the piece will come from
+    move = [None, None, None]
+    line = line_forms(board, p)
+    # print("Ai mills: ", ai_mills)
+    # print("line: ", line)
+    if not line.issubset(ai_mills):
+    # if line:
+        print("may nabuong line")
+        move[1] = next(iter(pieces_can_remove(board, p, line)))
+        for pos in line:
+            ai_mills.add(pos)
+    else:
+        if p == p1:
+            # move[0] = next(iter(actions(board)))
+            move[0] = pick_best_move(board, p1)
+        elif p == p2:
+            # move[0] = next(iter(actions(board)))
+            move[0] = pick_best_move(board, p2)
+
+
 
     return move
+
+
+def max_value(board):
+
+    # if the game is terminal state, return the state
+    if terminal(board):
+        return utility(board), None
+    
+    # get all possible actions in the current state
+    possible_actions = actions(board)
+    
+    # initialize v to negative infinity
+    v = float('-inf')
+    move = None
+    for action in possible_actions:
+        tmp, act = min_value(result(board, action))
+        if tmp > v:
+            v = tmp
+            move = action
+            if v == 1:
+                return v, move
+    
+    return v, move
+
+
+
+def min_value(board):
+    # if the game is terminal state, return the state
+    if terminal(board):
+        return utility(board), None
+    
+    # get all possible actions in the current state
+    possible_actions = actions(board)
+    
+    # initialize v to negative infinity
+    v = float('inf')
+    move = None
+    for action in possible_actions:
+        tmp, act = max_value(result(board, action))
+        if tmp < v:
+            v = tmp
+            print(v)
+            move = action
+            if v == -1:
+                return v, move
+    
+    return v, move
