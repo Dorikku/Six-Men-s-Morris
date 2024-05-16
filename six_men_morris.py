@@ -221,13 +221,13 @@ def pieces_can_remove(board, player, line):
         for i in range(5):
             for j in range(5):
                 if board[i][j] == p2:
-                    if (i,j) not in line:
+                    # if (i,j) not in line:
                         positions.add((i,j))
     elif player == p2:
         for i in range(5):
             for j in range(5):
                 if board[i][j] == p1:
-                    if (i,j) not in line:
+                    # if (i,j) not in line:
                         positions.add((i,j))
     
     return positions
@@ -337,7 +337,7 @@ def score_position_p2(board, player, mill):
         window = [(i) for i in list(board[:,r])]
         if r != 2:
             if window.count(player) == 3 and ((window[0] not in mill) or (window[1] not in mill)):
-                score += 1000
+                score += 100
             elif window.count(player) == 2 and window.count(EMPTY) == 1:
                 score += 10
 
@@ -451,7 +451,9 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
             elif is_terminal != ai_piece:
                 return (None, -100000000000000)
         else:
-            return (None, score_position_p2(board, ai_piece, ai_mill))
+            # return (None, score_position_p2(board, ai_piece, ai_mill))
+            return (None, score_position(board, ai_piece))
+
     
     if maximizingPlayer:
         value = -math.inf
@@ -483,7 +485,7 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
                 move_piece(b_copy, p, m, ai_piece)
                 mill = line_forms(b_copy, ai_piece)
 
-
+                remove = None
 
                 if not mill.issubset(ai_mill_copy):
                     print("mill forms in ai")
@@ -493,7 +495,7 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
                     can_remove = pieces_can_remove(b_copy, ai_piece, player_mill_copy)
                     remove = random.choice(list(can_remove))
                     remove_piece(b_copy, remove)
-                    action[2] = remove
+                    # action[2] = remove
                 # else:
                 #     action[2] = None
 
@@ -503,7 +505,7 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
                     value = new_score
                     action[0] = p
                     action[1] = m
-                    # action[2] = None
+                    action[2] = remove
 
                 # if p in ai_mill:
                 #     ai_mill.clear()
@@ -550,6 +552,7 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
                 move_piece(b_copy, p, m, player_piece)
                 mill = line_forms(b_copy, player_piece)
 
+                remove = None
 
                 if not mill.issubset(player_mill_copy):
                     for pos in mill:
@@ -568,7 +571,8 @@ def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, play
                     value = new_score
                     action[0] = p
                     action[1] = m
-                    # action[2] = None
+                    action[2] = remove
+
 
                 # if p in player_mill_copy:
                 #     player_mill_copy.clear()

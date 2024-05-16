@@ -366,7 +366,7 @@ while True:
                 for pos in mill:
                     ai_mills.add(pos)
 
-            action, minimax_score = smm.minimax(board, 4, -math.inf, math.inf, True, player, ai_mills, player_mills)
+            action, minimax_score = smm.minimax(board, 5, -math.inf, math.inf, True, player, ai_mills, player_mills)
 
             print("the action is: ", action)
             
@@ -399,7 +399,7 @@ while True:
             print("Player mills: ", player_mills)
             
             if action[0] in ai_mills:
-                    ai_mills.clear()
+                ai_mills.clear()
 
             # mill = smm.line_forms(board, player)
             
