@@ -4,6 +4,7 @@ import sys
 import time
 import copy
 import random
+import math
 
 import six_men_morris as smm
 
@@ -93,8 +94,9 @@ def draw_board():
             if (i,j) in free_slots:
                 pygame.draw.circle(screen, WHITE, circle, 40, 3)
 
+
             # Highlight enemy pieces that can be removed
-            if (i,j) in pieces_can_remove:
+            if (i,j) in pieces_can_remove and (i,j) not in ai_mills:
                 pygame.draw.circle(screen, BLACK, circle, 40, 3)
                 
 
@@ -152,7 +154,7 @@ board_origin = (BOARD_PADDING, BOARD_PADDING)
 
 
 
-
+game_over = False
 
 while True:
 
@@ -224,15 +226,11 @@ while True:
     draw_board()
     
 
-    # Checks if game over   
-    game_over = smm.terminal(board)
-
     # Checks if all pieces are placed to the board
     if smm.p1_piece_count == 0 and smm.p2_piece_count == 0:
         all_pieces_placed = True
 
     # line = smm.line_forms(board, player)
-
 
 
     # Show title    
@@ -247,12 +245,13 @@ while True:
 
 
     # ------------------ Draw players pieces ----------------------
-    if user == smm.p1:
-        draw_text("You", boldFont, WHITE, screen, 820, 120)
-        draw_text("Computer", boldFont, WHITE, screen, 820, 440)
-    elif user == smm.p2:
-        draw_text("Computer", boldFont, WHITE, screen, 820, 120)
-        draw_text("You", boldFont, WHITE, screen, 820, 440)
+    if not game_over:
+        if user == smm.p1:
+            draw_text("You", boldFont, WHITE, screen, 820, 120)
+            draw_text("Computer", boldFont, WHITE, screen, 820, 440)
+        elif user == smm.p2:
+            draw_text("Computer", boldFont, WHITE, screen, 820, 120)
+            draw_text("You", boldFont, WHITE, screen, 820, 440)
 
     for i in range(smm.p1_piece_count):
         pos = (
@@ -273,7 +272,6 @@ while True:
     if not all_pieces_placed:
         # -------------------- Check for AI move ---------------------------
         if user != player:
-            time.sleep(0.5)
 
             move = smm.pick_best_move(board, player)
             smm.put_piece(board, move, player)
@@ -284,9 +282,10 @@ while True:
             if not mill.issubset(ai_mills):
                 can_remove = smm.pieces_can_remove(board, player, ai_mills)
                 remove = random.choice(list(can_remove))
-                board = smm.remove_piece(board, remove)
+                smm.remove_piece(board, remove)
                 for pos in mill:
                     ai_mills.add(pos) 
+            
             
             player = smm.change_player(player)
 
@@ -306,7 +305,7 @@ while True:
                         line = smm.line_forms(board, player)
 
                         if not line.issubset(player_mills):
-                            pieces_can_remove = smm.pieces_can_remove(board, player, line)
+                            pieces_can_remove = smm.pieces_can_remove(board, player, ai_mills)
                             for pos in line:
                                 player_mills.add(pos)
                         else:
@@ -314,11 +313,105 @@ while True:
                         
 
                     if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
-                        board = smm.remove_piece(board, (i,j))
+                        smm.remove_piece(board, (i,j))
                         pieces_can_remove.clear()
                         player = smm.change_player(player)
 
+    else:
+        game_over = smm.winner(board)
+        # -------------------- Check for a user move -------------------------
+        click, _, _ = pygame.mouse.get_pressed()
+        if click == 1 and user == player and not game_over:
+            mouse = pygame.mouse.get_pos()
+            for i in range(HEIGHT):
+                for j in range(WIDTH):
 
+
+
+                    if board[i][j] == user and cells[i][j].collidepoint(mouse):
+                        clicked_piece = (i, j)
+                        free_slots = smm.moves(board, clicked_piece, player)
+                        
+                    if (cells[i][j].collidepoint(mouse) and (i,j) in free_slots):
+                        smm.move_piece(board, clicked_piece, (i,j), player)
+                        if clicked_piece in player_mills:
+                            player_mills.clear()
+                        
+                        line = smm.line_forms(board, player)
+
+                        if not line.issubset(player_mills):
+                            pieces_can_remove = smm.pieces_can_remove(board, player, ai_mills)
+                            for pos in line:
+                                player_mills.add(pos)
+                        else:
+                            player = smm.change_player(player)
+                            pass
+                        
+
+                    if (cells[i][j].collidepoint(mouse) and (i,j) in pieces_can_remove):
+                        smm.remove_piece(board, (i,j))
+                        pieces_can_remove.clear()
+                        player = smm.change_player(player)
+
+        # -------------------- Check for AI move ---------------------------
+        if user != player and not game_over:
+            time.sleep(0.5)
+
+            # piece_to_move = random.choice(list(smm.pieces_can_move(board, player)))
+            # move = random.choice(list(smm.moves(board, piece_to_move, player)))
+
+            mill = smm.line_forms(board, player)
+            
+            if not mill.issubset(ai_mills):
+                for pos in mill:
+                    ai_mills.add(pos)
+
+            action, minimax_score = smm.minimax(board, 4, -math.inf, math.inf, True, player, ai_mills, player_mills)
+
+            print("the action is: ", action)
+            
+            # if action[2]:
+            #     print("piece was removed")
+            #     # smm.move_piece(board, action[0], action[1], player)
+            #     smm.remove_piece(board, action[2])
+            # elif action[2] == None:
+            #     print("piece was moved")
+            #     smm.move_piece(board, action[0], action[1], player)
+            #     mill = smm.line_forms(board, player)
+            #     if not mill.issubset(ai_mills):
+            #         for pos in mill:
+            #             ai_mills.add(pos)
+            #         # can_remove = smm.pieces_can_remove(board, player, player_mills)
+            #         # remove = random.choice(list(can_remove))
+            #         action, minimax_score = smm.minimax(board, 1, -math.inf, math.inf, True, player, ai_mills, player_mills)
+            #         smm.remove_piece(board, action[2])
+            
+
+            if action[2]:
+                print("piece was removed")
+                smm.move_piece(board, action[0], action[1], player)
+                smm.remove_piece(board, action[2])
+            elif action[2] == None:
+                print("piece was moved")
+                smm.move_piece(board, action[0], action[1], player)
+                
+            print("Ai mills: ", ai_mills)
+            print("Player mills: ", player_mills)
+            
+            if action[0] in ai_mills:
+                    ai_mills.clear()
+
+            # mill = smm.line_forms(board, player)
+            
+            # if not mill.issubset(ai_mills):
+            #     for pos in mill:
+            #         ai_mills.add(pos)
+            #     can_remove = smm.pieces_can_remove(board, player, player_mills)
+            #     remove = random.choice(list(can_remove))
+            #     board = smm.remove_piece(board, remove)
+                
+                     
+            player = smm.change_player(player)
 
         """
         # -------------------- Check for AI move ---------------------------

@@ -4,6 +4,7 @@ Six Men Morris Player
 
 import copy
 import random
+import math
 import numpy as np
 
 
@@ -87,7 +88,11 @@ def moves(board, pos, player):
     """
     slots = set()
 
-    if piece_count(player) > 3:
+    # if piece_count(player) > 3:
+    count = np.count_nonzero(board == player)
+    # print("count: ", count)
+
+    if count > 3:
         # Check if adjacent empty slot exists for each position containing a piece
         for i in range(5):
             for j in range(5):
@@ -157,7 +162,7 @@ def moves(board, pos, player):
                             slots.add((i-1, j))
                         if board[i+1][j] == EMPTY:
                             slots.add((i+1, j))
-    else:
+    if count == 3:
         for i in range(5):
             for j in range(5):
                 if board[i][j] == EMPTY:
@@ -232,10 +237,10 @@ def remove_piece(board, pos):
     """
     Removes piece from the board
     """
-    result = copy.deepcopy(board)
+    # result = copy.deepcopy(board)
 
-    result[pos[0]][pos[1]] = EMPTY
-    return result
+    board[pos[0]][pos[1]] = EMPTY
+    # return result
 
 
 def result(board, action, p):
@@ -248,7 +253,6 @@ def result(board, action, p):
     if action[1] == None and action[2] == None:    
         result[action[0][0]][action[0][1]] = p
     elif action[1] != None:
-        print("tite")
         result[action[1][0]][action[1][1]] = EMPTY
     elif action[2] != None:
         result[action[0]][action[0][1]] = p
@@ -276,6 +280,7 @@ def result(board, action, p):
 #     return result
 
 
+
 def score_position(board, player):
     score = 0
     opp_player = p1
@@ -299,7 +304,7 @@ def score_position(board, player):
         window = [(i) for i in list(board[:,r])]
         if r != 2:
             if window.count(player) == 3:
-                score += 100
+                score += 1000
             elif window.count(player) == 2 and window.count(EMPTY) == 1:
                 score += 10
 
@@ -308,7 +313,38 @@ def score_position(board, player):
 
     return score
 
-    # For blocking 
+
+def score_position_p2(board, player, mill):
+    score = 0
+    opp_player = p1
+    if player == p1:
+        opp_player = p2
+
+    # for horizontal
+    for r in range(5):
+        window = [(i) for i in list(board[r,:])]
+        if r != 2:
+            if window.count(player) == 3 and ((window[0] not in mill) or (window[1] not in mill)):
+                score += 100
+            elif window.count(player) == 2 and window.count(EMPTY) == 1:
+                score += 10
+
+            if window.count(opp_player) == 2 and window.count(EMPTY) == 1:
+                score -= 50
+        
+    # for horizontal
+    for r in range(5):
+        window = [(i) for i in list(board[:,r])]
+        if r != 2:
+            if window.count(player) == 3 and ((window[0] not in mill) or (window[1] not in mill)):
+                score += 1000
+            elif window.count(player) == 2 and window.count(EMPTY) == 1:
+                score += 10
+
+            if window.count(opp_player) == 2 and window.count(EMPTY) == 1:
+                score -= 50
+
+    return score
 
 
 
@@ -335,6 +371,16 @@ def put_piece(board, pos, player):
     return board
 
 
+def move_piece(board, pos, action, player):
+    """
+    moves piece on the board
+    """
+
+    board[action[0]][action[1]] = player
+    board[pos[0]][pos[1]] = EMPTY
+
+    return board
+
 
 # Subtract player piece by 1
 def subtract_piece(p):
@@ -352,7 +398,15 @@ def winner(board):
     """
     Returns the winner of the game, if there is one.
     """
-    pass
+    p1_count = np.count_nonzero(board == p1)
+    p2_count = np.count_nonzero(board == p2)
+
+    if p1_count < 3:
+        return p2
+    elif p2_count < 3:
+        return p1
+
+    return None
 
 
 def terminal(board):
@@ -362,92 +416,373 @@ def terminal(board):
     pass
 
 
-def utility(board):
-    """
-    Returns 1 if X has won the game, -1 if O has won, 0 otherwise.
-    """
-
-    # check who is the winner and return the corresponding integer
-    if winner(board) == 1:
-        return 1
-    elif winner(board) == 2:
-        return -1 
+def utility(board, player):
+    if winner(board) == player:
+        return (None, 1)
+    elif winner(board) != player:
+        return (None, -1)
     else:
-        return 0
-
-
-def minimax(board, p):
-    """
-    Returns the optimal action for the current player on the board.
-    """
-    # Initialize move. [0] - where to place the piece
-    # [1] - what piece to remove
-    # [2] - frome where the piece will come from
-    move = [None, None, None]
-    line = line_forms(board, p)
-    # print("Ai mills: ", ai_mills)
-    # print("line: ", line)
-    if not line.issubset(ai_mills):
-    # if line:
-        print("may nabuong line")
-        move[1] = next(iter(pieces_can_remove(board, p, line)))
-        for pos in line:
-            ai_mills.add(pos)
-    else:
-        if p == p1:
-            # move[0] = next(iter(actions(board)))
-            move[0] = pick_best_move(board, p1)
-        elif p == p2:
-            # move[0] = next(iter(actions(board)))
-            move[0] = pick_best_move(board, p2)
-
-
-
-    return move
-
-
-def max_value(board):
-
-    # if the game is terminal state, return the state
-    if terminal(board):
-        return utility(board), None
+        return (None, 0)
     
-    # get all possible actions in the current state
-    possible_actions = actions(board)
+
+
+def pieces_can_move(board, player):
+    pieces = set()
+    for i in range(5):
+        for j in range(5):
+            if board[i][j] == player:
+                if moves(board, (i,j), player):
+                    pieces.add((i,j))
+    return pieces
+
+
+def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill, player_mill):
+    # valid_moves = pieces_can_move(board, maximizingPlayer)
+    is_terminal = winner(board)
     
-    # initialize v to negative infinity
-    v = float('-inf')
-    move = None
-    for action in possible_actions:
-        tmp, act = min_value(result(board, action))
-        if tmp > v:
-            v = tmp
-            move = action
-            if v == 1:
-                return v, move
+    # if is_terminal or depth == 0:
+    #     return utility(board, ai_piece)
     
-    return v, move
+
+    if depth == 0 or is_terminal:
+        if is_terminal:
+            if is_terminal == ai_piece:
+                return (None, 100000000000000)
+            elif is_terminal != ai_piece:
+                return (None, -100000000000000)
+        else:
+            return (None, score_position_p2(board, ai_piece, ai_mill))
+    
+    if maximizingPlayer:
+        value = -math.inf
+        pieces = pieces_can_move(board, ai_piece)
+        # pieces = zip(*np.where(board == ai_piece))
+
+        print("AI Moves: ", pieces)
+
+        # print("ai_pieces: ", pieces)
+        piece = random.choice(list(pieces))
+        
+        act = random.choice(list(moves(board, piece, ai_piece)))
+
+
+        action = [piece, act, None]
+
+
+        for p in pieces:
+            valid_moves = moves(board, p, ai_piece)
+            for m in valid_moves:
+                b_copy = copy.deepcopy(board)
+
+                ai_mill_copy = ai_mill.copy()
+                player_mill_copy = player_mill.copy()
+
+                
+
+               
+                move_piece(b_copy, p, m, ai_piece)
+                mill = line_forms(b_copy, ai_piece)
 
 
 
-def min_value(board):
-    # if the game is terminal state, return the state
-    if terminal(board):
-        return utility(board), None
+                if not mill.issubset(ai_mill_copy):
+                    print("mill forms in ai")
+                    for pos in mill:
+                        ai_mill_copy.add(pos)  
+                    
+                    can_remove = pieces_can_remove(b_copy, ai_piece, player_mill_copy)
+                    remove = random.choice(list(can_remove))
+                    remove_piece(b_copy, remove)
+                    action[2] = remove
+                # else:
+                #     action[2] = None
+
+                
+                new_score = minimax(b_copy, depth-1, alpha, beta, False, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                if new_score > value:
+                    value = new_score
+                    action[0] = p
+                    action[1] = m
+                    # action[2] = None
+
+                # if p in ai_mill:
+                #     ai_mill.clear()
+
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+        # if p in ai_mill:
+        #     ai_mill.clear()
+        # elif p in player_mill:
+        #     player_mill.clear()
+        return action, value
     
-    # get all possible actions in the current state
-    possible_actions = actions(board)
+    else:   # Minimizing player
+        value = math.inf
+
+        player_piece = p1
+        if ai_piece == p1:
+            player_piece = p2
+
+        pieces = pieces_can_move(board, player_piece)
+        # pieces = zip(*np.where(board == player_piece))
+
+        # print(board)
+        print("Player Moves: ", pieces)
+
+
+        # print("player piece: ", pieces)
+
+        piece = random.choice(list(pieces))
+
+        act = random.choice(list(moves(board, piece, player_piece)))
+        # print("Player Moves, " , list(moves(board, piece, player_piece)))
+
+        action = [piece, act, None]
+
+        for p in pieces:
+            valid_moves = moves(board, p, player_piece)
+            for m in valid_moves:
+                b_copy = copy.deepcopy(board)
+
+                ai_mill_copy = ai_mill.copy()
+                player_mill_copy = player_mill.copy()
+                move_piece(b_copy, p, m, player_piece)
+                mill = line_forms(b_copy, player_piece)
+
+
+                if not mill.issubset(player_mill_copy):
+                    for pos in mill:
+                        player_mill_copy.add(pos)
+                    
+                    can_remove = pieces_can_remove(b_copy, player_piece, ai_mill_copy)
+                    remove = random.choice(list(can_remove))
+                    remove_piece(b_copy, remove)
+                    action[2] = remove
+                # else:
+                #     action[2] = None
+
+                
+                new_score = minimax(b_copy, depth-1, alpha, beta, True, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                if new_score < value:
+                    value = new_score
+                    action[0] = p
+                    action[1] = m
+                    # action[2] = None
+
+                # if p in player_mill_copy:
+                #     player_mill_copy.clear()
+
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
+        # if p in ai_mill:
+        #     ai_mill.clear()
+        # elif p in player_mill:
+        #     player_mill.clear()        
+        return action, value
+
+"""
+def minimax(board, depth, alpha, beta, maximizingPlayer, ai_piece, ai_mill_copy, player_mill_copy):
+    # valid_moves = pieces_can_move(board, maximizingPlayer)
+    is_terminal = winner(board)
     
-    # initialize v to negative infinity
-    v = float('inf')
-    move = None
-    for action in possible_actions:
-        tmp, act = max_value(result(board, action))
-        if tmp < v:
-            v = tmp
-            print(v)
-            move = action
-            if v == -1:
-                return v, move
+    # if is_terminal or depth == 0:
+    #     return utility(board, ai_piece)
     
-    return v, move
+
+    if depth == 0 or is_terminal:
+        if is_terminal:
+            if is_terminal == ai_piece:
+                return (None, 100000000000000)
+            elif is_terminal != ai_piece:
+                return (None, -100000000000000)
+        else:
+            return (None, score_position(board, ai_piece))
+    
+    if maximizingPlayer:
+        value = -math.inf
+        pieces = pieces_can_move(board, ai_piece)
+        # pieces = zip(*np.where(board == ai_piece))
+
+        print("AI Moves: ", pieces)
+
+        # print("ai_pieces: ", pieces)
+        piece = random.choice(list(pieces))
+        
+        act = random.choice(list(moves(board, piece, ai_piece)))
+
+
+        action = [piece, act, None]
+
+
+        for p in pieces:
+            valid_moves = moves(board, p, ai_piece)
+            for m in valid_moves:
+                b_copy = copy.deepcopy(board)
+                print(b_copy)
+
+                mill = line_forms(b_copy, ai_piece)
+                # ai_mill_copy = ai_mill.copy()
+                # player_mill_copy = player_mill.copy()
+
+                if not mill.issubset(ai_mill_copy):
+                    print("mill forms in ai")
+                    for pos in mill:
+                        ai_mill_copy.add(pos)  
+                    
+                    can_remove = pieces_can_remove(b_copy, ai_piece, player_mill_copy)
+                    remove = random.choice(list(can_remove))
+
+                    # for r in can_remove:
+                        # board_copy = copy.deepcopy(b_copy)
+                    remove_piece(b_copy, remove)
+                    new_score = minimax(b_copy, depth-1, alpha, beta, False, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                    if new_score > value:
+                        value = new_score
+                        action[0] = p
+                        action[1] = m
+                        action[2] = remove
+                    # return remove, 1000
+                else:
+                    move_piece(b_copy, p, m, ai_piece)
+                    if p in ai_mill_copy:
+                        ai_mill_copy.clear()
+                    new_score = minimax(b_copy, depth-1, alpha, beta, False, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                    if new_score > value:
+                        value = new_score
+                        action[0] = p
+                        action[1] = m
+                        action[2] = None
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+        return action, value
+    
+    else:   # Minimizing player
+        value = math.inf
+
+        player_piece = p1
+        if ai_piece == p1:
+            player_piece = p2
+
+        pieces = pieces_can_move(board, player_piece)
+        # pieces = zip(*np.where(board == player_piece))
+
+        # print(board)
+        print("Player Moves: ", pieces)
+
+
+        # print("player piece: ", pieces)
+
+        piece = random.choice(list(pieces))
+
+        act = random.choice(list(moves(board, piece, player_piece)))
+        # print("Player Moves, " , list(moves(board, piece, player_piece)))
+
+        action = [piece, act, None]
+
+        for p in pieces:
+            valid_moves = moves(board, p, player_piece)
+            for m in valid_moves:
+                b_copy = copy.deepcopy(board)
+                print(b_copy)
+                mill = line_forms(b_copy, player_piece)
+                # ai_mill_copy = ai_mill.copy()
+                # player_mill_copy = player_mill.copy()
+
+                if not mill.issubset(player_mill_copy):
+                    for pos in mill:
+                        player_mill_copy.add(pos)
+                    
+                    can_remove = pieces_can_remove(b_copy, player_piece, ai_mill_copy)
+                    remove = random.choice(list(can_remove))
+
+                    # for r in can_remove:
+                    #     board_copy = copy.deepcopy(b_copy)
+                    remove_piece(b_copy, remove)
+                    new_score = minimax(b_copy, depth-1, alpha, beta, True, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                    if new_score > value:
+                        value = new_score
+                        action[0] = p
+                        action[1] = m
+                        action[2] = remove
+                    # return action, value
+                    # return remove, -1000
+                else:
+                    move_piece(b_copy, p, m, player_piece)
+                    new_score = minimax(b_copy, depth-1, alpha, beta, True, ai_piece, ai_mill_copy, player_mill_copy)[1]
+                    if new_score < value:
+                        value = new_score
+                        action[0] = p
+                        action[1] = m
+                        action[2] = None
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
+        return action, value
+"""
+
+        
+"""
+    else:   # Minimizing player
+        value = math.inf
+
+        player_piece = p1
+        if ai_piece == p1:
+            player_piece = p2
+
+        pieces = pieces_can_move(board, player_piece)
+
+
+        print("player piece: ", pieces)
+
+        piece = random.choice(list(pieces))
+        act = random.choice(list(moves(board, piece, player_piece)))
+
+        action = [piece, act]
+
+        for p in pieces:
+            b_copy = board.copy()
+            valid_moves = moves(b_copy, p, player_piece)
+            for m in valid_moves:
+                move_piece(b_copy, p, m, player_piece)
+                new_score = minimax(b_copy, depth-1, alpha, beta, True, ai_piece)[1]
+                if new_score < value:
+                    value = new_score
+                    action[0] = p
+                    action[1] = m
+                # beta = min(beta, value)
+                # if alpha >= beta:
+                    break
+        return action, value
+"""
+
+# def minimax(board, p):
+#     """
+#     Returns the optimal action for the current player on the board.
+#     """
+#     # Initialize move. [0] - where to place the piece
+#     # [1] - what piece to remove
+#     # [2] - frome where the piece will come from
+#     move = [None, None, None]
+#     line = line_forms(board, p)
+#     # print("Ai mills: ", ai_mills)
+#     # print("line: ", line)
+#     if not line.issubset(ai_mills):
+#     # if line:
+#         print("may nabuong line")
+#         move[1] = next(iter(pieces_can_remove(board, p, line)))
+#         for pos in line:
+#             ai_mills.add(pos)
+#     else:
+#         if p == p1:
+#             # move[0] = next(iter(actions(board)))
+#             move[0] = pick_best_move(board, p1)
+#         elif p == p2:
+#             # move[0] = next(iter(actions(board)))
+#             move[0] = pick_best_move(board, p2)
+
+
+
+#     return move

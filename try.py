@@ -30,3 +30,13 @@ def score_position(board, player):
         
     return score
 
+# count = np.count_nonzero(board == EMPTY)
+# print(count)
+# x = [0, 1]
+
+# game_over = x
+
+# if len(x) == 2:
+#     print("2 siya")
+
+print(np.where(board == R))
